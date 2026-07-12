@@ -1,8 +1,9 @@
-use whichway::{find_matches};
 use clap::Parser;
 use std::env;
+use whichway::{explain, resolve_all};
 
 #[derive(Parser, Debug)]
+#[command(name = "whichway")]
 struct Cli {
     command: String,
 }
@@ -10,14 +11,15 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
     let path_var = env::var("PATH").unwrap_or_default();
-    let matches = find_matches(&cli.command, &path_var);
+    let results = resolve_all(&cli.command, &path_var);
 
-    if matches.is_empty() {
+    if results.is_empty() {
         println!("No matches found for: {}", cli.command);
-    } else {
-        println!("Resolution order for: {}", cli.command);
-        for (i, path) in matches.iter().enumerate() {
-            println!("  {}. {}", i, path.display());
-        }
+        return;
+    }
+
+    println!("Resolution order for: {}", cli.command);
+    for (i, m) in results.iter().enumerate() {
+        println!("  {}. {}  {}", i, m.path.display(), explain(m));
     }
 }
