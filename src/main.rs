@@ -1,6 +1,7 @@
 use clap::Parser;
 use std::env;
-use whichway::{explain, resolve_all};
+use whichway::report::explain;
+use whichway::resolvers::resolve_all;
 
 #[derive(Parser, Debug)]
 #[command(name = "whichway")]
