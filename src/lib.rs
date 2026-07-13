@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 use std::{env, fs};
+use std::fmt::{Display, Formatter};
 
 pub fn find_matches(cmd: &str, path_var: &str) -> Vec<PathBuf> {
-    env::split_paths(&path_var)
+    env::split_paths(path_var)
         .map(|dir| dir.join(cmd))
         .filter(|path| path.is_file())
         .collect()
@@ -12,6 +13,7 @@ pub enum MatchKind {
     RealBinary,
     Symlink { target: PathBuf },
     Shim,
+    NotIdentified(String),
 }
 
 #[derive(Debug)]
@@ -21,22 +23,43 @@ pub struct ResolvedMatch {
     is_active: bool,
 }
 
-pub fn classify(path: &PathBuf) -> MatchKind {
-    let metadata = fs::symlink_metadata(path).unwrap();
+#[derive(Debug)]
+pub enum ClassifyError {
+    MetadataReadFailed(std::io::Error),
+    ReadLinkFailed(std::io::Error),
+}
+
+impl Display for ClassifyError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ClassifyError::MetadataReadFailed(e) => write!(f, "Failed to read metadata: {}", e),
+            ClassifyError::ReadLinkFailed(e) => write!(f, "Failed to read link: {}", e),
+        }
+    }
+}
+
+pub fn classify(path: &PathBuf) -> Result<MatchKind, ClassifyError> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(err) => return Err(ClassifyError::MetadataReadFailed(err))
+    };
 
     if metadata.file_type().is_symlink() {
-        let target = fs::read_link(path).unwrap();
-        return MatchKind::Symlink { target };
+        let target = match fs::read_link(path) {
+            Ok(target) => target,
+            Err(err) => return Err(ClassifyError::ReadLinkFailed(err))
+        };
+        return Ok(MatchKind::Symlink { target });
     }
 
     // TODO: Windows shim detection (.bat/.cmd) is not yet supported
     if let Ok(content) = fs::read_to_string(path) {
         if content.starts_with("#!") {
-            return MatchKind::Shim;
+            return Ok(MatchKind::Shim);
         }
     }
 
-    MatchKind::RealBinary
+    Ok(MatchKind::RealBinary)
 }
 
 pub fn explain(m: &ResolvedMatch) -> String {
@@ -49,6 +72,7 @@ pub fn explain(m: &ResolvedMatch) -> String {
         MatchKind::RealBinary => format!("[real binary]   {}", status),
         MatchKind::Symlink { target } => format!("[symlink -> {}]   {}", target.display(), status),
         MatchKind::Shim => format!("[shim script]   {}", status),
+        MatchKind::NotIdentified(reason) => format!("[Not Identified: {}]    {}", reason, status)
     }
 }
 
@@ -57,7 +81,7 @@ pub fn resolve_all(cmd: &str, path_var: &str) -> Vec<ResolvedMatch> {
         .into_iter()
         .enumerate()
         .map(|(i, path)| {
-            let kind = classify(&path);
+            let kind = classify(&path).unwrap_or_else(|err| MatchKind::NotIdentified(err.to_string()));
             ResolvedMatch {
                 path,
                 kind,
@@ -126,7 +150,7 @@ mod tests {
         #[cfg(windows)]
         std::os::windows::fs::symlink_file(original_file_path, link_path).unwrap();
 
-        let classification = classify(&link_path);
+        let classification = classify(&link_path).unwrap();
 
         assert_eq!(
             classification,
@@ -146,7 +170,7 @@ mod tests {
         )
         .unwrap();
 
-        let classification = classify(&file_path);
+        let classification = classify(&file_path).unwrap();
 
         assert_eq!(classification, MatchKind::Shim);
     }
@@ -157,7 +181,16 @@ mod tests {
         let file_path = dir.path().join("myapp");
         fs::write(&file_path, [0x7F, 0x45, 0x4C, 0x46, 0x02, 0x01]).unwrap();
 
-        let classification = classify(&file_path);
+        let classification = classify(&file_path).unwrap();
         assert_eq!(classification, MatchKind::RealBinary);
+    }
+
+    #[test]
+    fn classify_nonexistent_path_returns_error() {
+        let dir = tempdir().unwrap();
+        let missing = dir.path().join("does-not-exist");
+
+        let result = classify(&missing);
+        assert!(result.is_err());
     }
 }
