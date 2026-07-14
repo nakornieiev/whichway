@@ -1,4 +1,4 @@
-use crate::resolvers::{MatchKind, ResolvedMatch};
+use crate::resolvers::{ManagerInfo, MatchKind, ResolvedMatch};
 use owo_colors::{OwoColorize, Stream::Stdout};
 
 pub fn explain(m: &ResolvedMatch) -> String {
@@ -7,10 +7,11 @@ pub fn explain(m: &ResolvedMatch) -> String {
     } else {
         "shadowed".if_supports_color(Stdout, |text| text.bright_black()).to_string()
     };
+
     let tag = match &m.kind {
-        MatchKind::RealBinary => "[real binary]".to_string(),
-        MatchKind::Symlink { target } => format!("[symlink -> {}]", target.display()),
-        MatchKind::Shim {manager} => format!("[{:?} shim]", manager),
+        MatchKind::RealBinary => "real binary".to_string(),
+        MatchKind::Symlink { target } => format!("symlink -> {}", target.display()),
+        MatchKind::Shim => "shim".to_string(),
         MatchKind::NotIdentified(reason) => {
             return format!(
                 "{}   {}",
@@ -21,7 +22,18 @@ pub fn explain(m: &ResolvedMatch) -> String {
         },
     };
 
+    let manager = match &m.manager {
+        Some(info) => match info {
+            ManagerInfo::Nvm => "nvm ",
+            ManagerInfo::Pyenv => "pyenv ",
+            ManagerInfo::Asdf => "asdf ",
+        }
+        None => ""
+    };
+
+    let tag = format!("[{}{}]", manager, tag);
+
     let tag = tag.if_supports_color(Stdout, |text| text.dimmed());
 
-    format!("{}    {}", tag, status)
+    format!("{}   {}", tag, status)
 }

@@ -8,7 +8,7 @@ use crate::shim_detect::detect_manager;
 pub enum MatchKind {
     RealBinary,
     Symlink { target: PathBuf },
-    Shim { manager: Option<ManagerInfo> },
+    Shim,
     NotIdentified(String),
 }
 
@@ -19,10 +19,11 @@ pub enum ManagerInfo {
     Pyenv
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq)]
 pub struct ResolvedMatch {
     pub path: PathBuf,
     pub kind: MatchKind,
+    pub manager: Option<ManagerInfo>,
     pub is_active: bool,
 }
 
@@ -48,7 +49,7 @@ pub fn find_matches(cmd: &str, path_var: &str) -> Vec<PathBuf> {
         .collect()
 }
 
-pub fn classify(path: &PathBuf) -> Result<MatchKind, ClassifyError> {
+pub fn classify(path: &PathBuf, content: &str) -> Result<MatchKind, ClassifyError> {
     let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
         Err(err) => return Err(ClassifyError::MetadataReadFailed(err)),
@@ -63,12 +64,10 @@ pub fn classify(path: &PathBuf) -> Result<MatchKind, ClassifyError> {
     }
 
     // TODO: Windows shim detection (.bat/.cmd) is not yet supported
-    if let Ok(content) = fs::read_to_string(path)
-        && content.starts_with("#!") {
-            return Ok(MatchKind::Shim { manager: detect_manager(path, &content) });
-        }
+    if content.starts_with("#!") {
+        return Ok(MatchKind::Shim);
+    }
 
-    // TODO: nvm real binary show manager info
     Ok(MatchKind::RealBinary)
 }
 
@@ -77,11 +76,14 @@ pub fn resolve_all(cmd: &str, path_var: &str) -> Vec<ResolvedMatch> {
         .into_iter()
         .enumerate()
         .map(|(i, path)| {
+            let content = fs::read_to_string(&path).unwrap_or_default();
+            let manager = detect_manager(&path, &content);
             let kind =
-                classify(&path).unwrap_or_else(|err| MatchKind::NotIdentified(err.to_string()));
+                classify(&path, &content).unwrap_or_else(|err| MatchKind::NotIdentified(err.to_string()));
             ResolvedMatch {
                 path,
                 kind,
+                manager,
                 is_active: i == 0,
             }
         })
@@ -147,7 +149,7 @@ mod tests {
         #[cfg(windows)]
         std::os::windows::fs::symlink_file(original_file_path, link_path).unwrap();
 
-        let classification = classify(&link_path).unwrap();
+        let classification = classify(&link_path, "").unwrap();
 
         assert_eq!(
             classification,
@@ -167,26 +169,11 @@ mod tests {
         )
         .unwrap();
 
-        let classification = classify(&file_path).unwrap();
+        let content = fs::read_to_string(&file_path).unwrap();
 
-        // TODO: Correct this test
-        assert_eq!(classification, MatchKind::Shim{ manager: None });
-    }
+        let classification = classify(&file_path, &content).unwrap();
 
-    #[test]
-    fn classify_shim_with_manager() {
-        let dir = tempdir().unwrap();
-        let file_path = dir.path().join("myapp");
-        fs::write(
-            &file_path,
-            "#!/usr/bin/env bash\nexec .asdf exec python \"$@\"\n",
-        )
-            .unwrap();
-
-        let classification = classify(&file_path).unwrap();
-
-        // TODO: Correct this test
-        assert_eq!(classification, MatchKind::Shim{ manager: Some(ManagerInfo::Asdf) });
+        assert_eq!(classification, MatchKind::Shim);
     }
 
     #[test]
@@ -195,7 +182,7 @@ mod tests {
         let file_path = dir.path().join("myapp");
         fs::write(&file_path, [0x7F, 0x45, 0x4C, 0x46, 0x02, 0x01]).unwrap();
 
-        let classification = classify(&file_path).unwrap();
+        let classification = classify(&file_path, "").unwrap();
         assert_eq!(classification, MatchKind::RealBinary);
     }
 
@@ -204,7 +191,76 @@ mod tests {
         let dir = tempdir().unwrap();
         let missing = dir.path().join("does-not-exist");
 
-        let result = classify(&missing);
+        let result = classify(&missing, "");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn resolve_all_finds_symlink() {
+        let dir = tempdir().unwrap();
+        let symlink = dir.path().join("target");
+        fs::write(&symlink, "").unwrap();
+        let link_path = dir.path().join("myapp");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&symlink, &link_path).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_file(&symlink, &link_path).unwrap();
+
+        let resolved = resolve_all("myapp", dir.path().to_str().unwrap());
+        assert_eq!(resolved[0], ResolvedMatch { path: link_path, kind: MatchKind::Symlink { target: symlink }, manager: None, is_active: true });
+    }
+
+    #[test]
+    fn resolve_all_finds_shim() {
+        let dir = tempdir().unwrap();
+        let shim = dir.path().join("myapp");
+        fs::write(
+            &shim,
+            "#!/usr/bin/env bash\nexec asdf exec python \"$@\"\n",
+        )
+            .unwrap();
+
+        let resolved = resolve_all("myapp", dir.path().to_str().unwrap());
+        assert_eq!(resolved[0], ResolvedMatch { path: shim, kind: MatchKind::Shim, manager: None, is_active: true });
+    }
+    #[test]
+    fn resolve_all_finds_binary() {
+        let dir = tempdir().unwrap();
+        let binary = dir.path().join("myapp");
+        fs::write(&binary, [0x7F, 0x45, 0x4C, 0x46, 0x02, 0x01]).unwrap();
+
+        let resolved = resolve_all("myapp", dir.path().to_str().unwrap());
+        assert_eq!(resolved[0], ResolvedMatch { path: binary, kind: MatchKind::RealBinary, manager: None, is_active: true });
+    }
+
+    #[test]
+    fn resolve_all_finds_manager_via_path() {
+        let dir = tempdir().unwrap();
+        let manager_bin = dir.path().join(".nvm").join("versions").join("node").join("v18.0.0").join("bin");
+        fs::create_dir_all(&manager_bin).unwrap();
+
+        let binary = manager_bin.join("node");
+        fs::write(&binary, [0x7F, 0x45, 0x4C, 0x46, 0x02, 0x01]).unwrap();
+
+        let resolved = resolve_all("node", manager_bin.to_str().unwrap());
+
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].kind, MatchKind::RealBinary);
+        assert_eq!(resolved[0].manager, Some(ManagerInfo::Nvm));
+    }
+
+    #[test]
+    fn resolve_all_finds_manager_via_content_fallback() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("myapp");
+        fs::write(
+            &file_path,
+            "#!/usr/bin/env bash\nexec .asdf exec python \"$@\"\n",
+        ).unwrap();
+
+        let resolved = resolve_all("myapp", dir.path().to_str().unwrap());
+
+        assert_eq!(resolved[0].kind, MatchKind::Shim);
+        assert_eq!(resolved[0].manager, Some(ManagerInfo::Asdf));
     }
 }
