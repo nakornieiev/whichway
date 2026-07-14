@@ -9,7 +9,7 @@ pub fn explain(m: &ResolvedMatch) -> String {
     match &m.kind {
         MatchKind::RealBinary => format!("[real binary]   {}", status),
         MatchKind::Symlink { target } => format!("[symlink -> {}]   {}", target.display(), status),
-        MatchKind::Shim => format!("[shim script]   {}", status),
+        MatchKind::Shim {manager} => format!("[shim script    {:?}]   {}", manager, status),
         MatchKind::NotIdentified(reason) => format!("[Not Identified: {}]    {}", reason, status),
     }
 }

@@ -6,8 +6,15 @@ use std::{env, fs};
 pub enum MatchKind {
     RealBinary,
     Symlink { target: PathBuf },
-    Shim,
+    Shim { manager: Option<ManagerInfo> },
     NotIdentified(String),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ManagerInfo {
+    Asdf,
+    Nvm,
+    Pyenv
 }
 
 #[derive(Debug)]
@@ -23,13 +30,6 @@ pub enum ClassifyError {
     ReadLinkFailed(std::io::Error),
 }
 
-pub fn find_matches(cmd: &str, path_var: &str) -> Vec<PathBuf> {
-    env::split_paths(path_var)
-        .map(|dir| dir.join(cmd))
-        .filter(|path| path.is_file())
-        .collect()
-}
-
 impl Display for ClassifyError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -37,6 +37,13 @@ impl Display for ClassifyError {
             ClassifyError::ReadLinkFailed(e) => write!(f, "Failed to read link: {}", e),
         }
     }
+}
+
+pub fn find_matches(cmd: &str, path_var: &str) -> Vec<PathBuf> {
+    env::split_paths(path_var)
+        .map(|dir| dir.join(cmd))
+        .filter(|path| path.is_file())
+        .collect()
 }
 
 pub fn classify(path: &PathBuf) -> Result<MatchKind, ClassifyError> {
@@ -56,7 +63,8 @@ pub fn classify(path: &PathBuf) -> Result<MatchKind, ClassifyError> {
     // TODO: Windows shim detection (.bat/.cmd) is not yet supported
     if let Ok(content) = fs::read_to_string(path)
         && content.starts_with("#!") {
-            return Ok(MatchKind::Shim);
+        // TODO:: add manager identification
+            return Ok(MatchKind::Shim { manager: Some(ManagerInfo::Nvm) });
         }
 
     Ok(MatchKind::RealBinary)
@@ -159,7 +167,8 @@ mod tests {
 
         let classification = classify(&file_path).unwrap();
 
-        assert_eq!(classification, MatchKind::Shim);
+        // TODO: Correct this test
+        assert_eq!(classification, MatchKind::Shim{ manager: None });
     }
 
     #[test]
