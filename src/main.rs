@@ -37,6 +37,6 @@ fn main() {
 
     println!("Resolution order for: {}", cli.command);
     for (i, m) in results.iter().enumerate() {
-        println!("  {}. {}  {}", i + 1, m.path.display(), explain(m));
+        println!("  {}. {}   {}", i + 1, m.path.display(), explain(m));
     }
 }

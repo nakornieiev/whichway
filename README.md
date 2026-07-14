@@ -73,10 +73,10 @@ of solving a real, small, currently-unsolved annoyance rather than
 reinventing an existing tool.
 
 **MVP scope:**
-- [ ] `whichway <cmd>` — resolution chain with explanations
+- [x] `whichway <cmd>` — resolution chain with explanations
 - [ ] `whichway doctor` — duplicates, broken symlinks, orphaned shims
 - [ ] bash / zsh support
-- [ ] `--json` output for scripting
+- [x] `--json` output for scripting
 
 **Later:**
 - [ ] `whichway diff` — login vs interactive shell comparison
