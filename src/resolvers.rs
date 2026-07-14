@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::{env, fs};
+use crate::shim_detect::detect_manager;
 
 #[derive(Debug, PartialEq)]
 pub enum MatchKind {
@@ -63,8 +64,7 @@ pub fn classify(path: &PathBuf) -> Result<MatchKind, ClassifyError> {
     // TODO: Windows shim detection (.bat/.cmd) is not yet supported
     if let Ok(content) = fs::read_to_string(path)
         && content.starts_with("#!") {
-        // TODO:: add manager identification
-            return Ok(MatchKind::Shim { manager: Some(ManagerInfo::Nvm) });
+            return Ok(MatchKind::Shim { manager: detect_manager(path, &content) });
         }
 
     Ok(MatchKind::RealBinary)
@@ -156,7 +156,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn classify_shim() {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("myapp");
@@ -170,6 +169,22 @@ mod tests {
 
         // TODO: Correct this test
         assert_eq!(classification, MatchKind::Shim{ manager: None });
+    }
+
+    #[test]
+    fn classify_shim_with_manager() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("myapp");
+        fs::write(
+            &file_path,
+            "#!/usr/bin/env bash\nexec .asdf exec python \"$@\"\n",
+        )
+            .unwrap();
+
+        let classification = classify(&file_path).unwrap();
+
+        // TODO: Correct this test
+        assert_eq!(classification, MatchKind::Shim{ manager: Some(ManagerInfo::Asdf) });
     }
 
     #[test]
