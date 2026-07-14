@@ -1,9 +1,10 @@
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::{env, fs};
+use serde::Serialize;
 use crate::shim_detect::detect_manager;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum MatchKind {
     RealBinary,
     Symlink { target: PathBuf },
@@ -11,14 +12,14 @@ pub enum MatchKind {
     NotIdentified(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum ManagerInfo {
     Asdf,
     Nvm,
     Pyenv
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct ResolvedMatch {
     pub path: PathBuf,
     pub kind: MatchKind,
@@ -67,6 +68,7 @@ pub fn classify(path: &PathBuf) -> Result<MatchKind, ClassifyError> {
             return Ok(MatchKind::Shim { manager: detect_manager(path, &content) });
         }
 
+    // TODO: nvm real binary show manager info
     Ok(MatchKind::RealBinary)
 }
 
