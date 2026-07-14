@@ -14,6 +14,14 @@ pub fn detect_manager(path: &Path, content: &str) -> Option<ManagerInfo> {
         }
     }
 
+    if content.contains(".asdf") {
+        return Some(ManagerInfo::Asdf);
+    } else if content.contains(".pyenv") {
+        return Some(ManagerInfo::Pyenv);
+    } else if content.contains(".nvm") {
+        return Some(ManagerInfo::Nvm);
+    }
+
     None
 }
 
@@ -43,6 +51,27 @@ mod tests {
 
         let manager_info = detect_manager(&path, "");
         assert_eq!(manager_info, Some(ManagerInfo::Pyenv));
+    }
+
+    #[test]
+    fn detect_asdf_by_content_when_path_unhelpful() {
+        let path = Path::new("/some/random/place/python");
+        let content = "#!/bin/bash\nexec .asdf stuff";
+        assert_eq!(detect_manager(path, content), Some(ManagerInfo::Asdf));
+    }
+
+    #[test]
+    fn detect_pyenv_by_content_when_path_unhelpful() {
+        let path = Path::new("/some/random/place/python");
+        let content = "#!/bin/bash\nexec .pyenv stuff";
+        assert_eq!(detect_manager(path, content), Some(ManagerInfo::Pyenv));
+    }
+
+    #[test]
+    fn detect_nvm_by_content_when_path_unhelpful() {
+        let path = Path::new("/some/random/place/node");
+        let content = "#!/bin/bash\nexec .nvm stuff";
+        assert_eq!(detect_manager(path, content), Some(ManagerInfo::Nvm));
     }
 
     #[test]

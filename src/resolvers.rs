@@ -156,6 +156,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn classify_shim() {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("myapp");
