@@ -2,6 +2,7 @@ use clap::Parser;
 use std::env;
 use whichway::report::explain;
 use whichway::resolvers::resolve_all;
+use owo_colors::set_override;
 
 #[derive(Parser, Debug)]
 #[command(name = "whichway")]
@@ -9,7 +10,10 @@ struct Cli {
     command: String,
 
     #[arg(long)]
-    json: bool
+    json: bool,
+
+    #[arg(long)]
+    no_color: bool,
 }
 
 fn main() {
@@ -20,6 +24,10 @@ fn main() {
     if cli.json {
         println!("{}", serde_json::to_string_pretty(&results).unwrap());
         return;
+    }
+
+    if cli.no_color {
+        set_override(false);
     }
 
     if results.is_empty() {
