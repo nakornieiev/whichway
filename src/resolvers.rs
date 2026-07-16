@@ -19,6 +19,16 @@ pub enum ManagerInfo {
     Pyenv
 }
 
+impl ManagerInfo {
+    pub fn home_dir(&self) -> &'static str {
+        match self {
+            ManagerInfo::Asdf => ".asdf",
+            ManagerInfo::Nvm => ".nvm",
+            ManagerInfo::Pyenv => ".pyenv"
+        }
+    }
+}
+
 #[derive(Debug, Serialize, PartialEq)]
 pub struct ResolvedMatch {
     pub path: PathBuf,

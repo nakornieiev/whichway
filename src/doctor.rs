@@ -1,6 +1,7 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{env, fs};
 use std::collections::HashMap;
+use crate::shim_detect::detect_manager;
 
 fn list_all_executables(path_var: &str) -> Vec<PathBuf> {
     let mut paths = Vec::new();
@@ -44,6 +45,23 @@ fn find_broken_symlinks(paths: &[PathBuf]) -> Vec<PathBuf> {
         })
         .cloned()
         .collect()
+}
+
+fn find_orphan_shims(paths: &[PathBuf], home: &Path) -> Vec<PathBuf> {
+    let mut orphan_shims: Vec<PathBuf> = Vec::new();
+
+
+    for path in paths {
+        let content = fs::read_to_string(&path).unwrap_or(String::from(""));
+
+        if let Some(manager) = detect_manager(&path, &content) {
+            if !home.join(manager.home_dir()).exists() {
+                orphan_shims.push(path.clone());
+            }
+        }
+    }
+
+    orphan_shims
 }
 
 #[cfg(test)]
@@ -101,5 +119,28 @@ mod tests {
 
         assert_eq!(broken.len(), 1);
         assert_eq!(broken[0], broken_link);
+    }
+
+    #[test]
+    fn find_no_orphan_shims() {
+        let home = tempdir().unwrap();
+        fs::write(home.path().join(".pyenv"), "").unwrap();
+
+        let shim = home.path().join("python");
+        fs::write(&shim, "#!/bin/bash\nexec .pyenv exec python\n").unwrap();
+
+        let orphan_shims = find_orphan_shims(&[shim], home.path());
+
+        assert!(orphan_shims.is_empty());
+    }
+
+    #[test]
+    fn find_some_orphan_shims() {
+        let dir = tempdir().unwrap();
+        let shim = dir.path().join("python");
+        fs::write(&shim, "#!/bin/bash\nexec .pyenv exec python\n").unwrap();
+
+        let orphan_shims = find_orphan_shims(&[shim], dir.path());
+        assert_eq!(orphan_shims.len(), 1);
     }
 }
