@@ -8,8 +8,12 @@ fn list_all_executables(path_var: &str) -> Vec<PathBuf> {
     for path in env::split_paths(path_var){
         if let Ok(entries) = fs::read_dir(&path) {
             for entry in entries.flatten() {
-                if entry.path().is_file() {
-                    paths.push(entry.path());
+                let path = entry.path();
+
+                if let Ok(meta) = fs::symlink_metadata(&path) {
+                    if meta.is_file() || meta.file_type().is_symlink() {
+                        paths.push(path);
+                    }
                 }
             }
         }
@@ -27,6 +31,19 @@ fn find_duplicates(paths: Vec<PathBuf>) -> HashMap<String, Vec<PathBuf>> {
     }
 
     grouped.into_iter().filter(|(_, v)| v.len() > 1).collect()
+}
+
+fn find_broken_symlinks(paths: &[PathBuf]) -> Vec<PathBuf> {
+    paths
+        .iter()
+        .filter(|path| {
+            fs::symlink_metadata(path)
+                .map(|meta| meta.file_type().is_symlink())
+                .unwrap_or(false)
+                && !path.exists()
+        })
+        .cloned()
+        .collect()
 }
 
 #[cfg(test)]
@@ -65,5 +82,24 @@ mod tests {
         let duplicates = find_duplicates(paths);
 
         assert!(!duplicates.contains_key("uniqueapp"));
+    }
+
+    #[test]
+    fn find_one_broken_symlink() {
+        let dir = tempdir().unwrap();
+        let missing_target = dir.path().join("does_not_exist");
+        let broken_link = dir.path().join("myapp");
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&missing_target, &broken_link).unwrap();
+
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_file(&missing_target, &broken_link).unwrap();
+
+        let all = list_all_executables(dir.path().to_str().unwrap());
+        let broken = find_broken_symlinks(&all);
+
+        assert_eq!(broken.len(), 1);
+        assert_eq!(broken[0], broken_link);
     }
 }
