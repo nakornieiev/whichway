@@ -1,8 +1,8 @@
+use crate::shim_detect::detect_manager;
+use serde::Serialize;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
-use std::collections::HashMap;
-use serde::Serialize;
-use crate::shim_detect::detect_manager;
 
 #[derive(Serialize, Debug)]
 pub struct DoctorReport {
@@ -14,15 +14,16 @@ pub struct DoctorReport {
 fn list_all_executables(path_var: &str) -> Vec<PathBuf> {
     let mut paths = Vec::new();
 
-    for path in env::split_paths(path_var){
+    for path in env::split_paths(path_var) {
         if let Ok(entries) = fs::read_dir(&path) {
             for entry in entries.flatten() {
                 let path = entry.path();
 
                 if let Ok(meta) = fs::symlink_metadata(&path)
-                    && (meta.is_file() || meta.file_type().is_symlink()) {
-                        paths.push(path);
-                    }
+                    && (meta.is_file() || meta.file_type().is_symlink())
+                {
+                    paths.push(path);
+                }
             }
         }
     }
@@ -60,14 +61,14 @@ fn find_broken_symlinks(paths: &[PathBuf]) -> Vec<PathBuf> {
 fn find_orphan_shims(paths: &[PathBuf], home: &Path) -> Vec<PathBuf> {
     let mut orphan_shims: Vec<PathBuf> = Vec::new();
 
-
     for path in paths {
         let content = fs::read_to_string(path).unwrap_or(String::from(""));
 
         if let Some(manager) = detect_manager(path, &content)
-            && !home.join(manager.home_dir()).exists() {
-                orphan_shims.push(path.clone());
-            }
+            && !home.join(manager.home_dir()).exists()
+        {
+            orphan_shims.push(path.clone());
+        }
     }
 
     orphan_shims
@@ -178,14 +179,15 @@ mod tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink(&missing_target, &broken_link).unwrap();
         #[cfg(windows)]
-        std::os::windows::fs::symlink(&missing_target, &broken_link).unwrap();
+        std::os::windows::fs::symlink_file(&missing_target, &broken_link).unwrap();
 
         // Orphan shim
         let orphan_dir = tempdir().unwrap();
         fs::write(
             orphan_dir.path().join("orphanapp"),
             "#!/bin/bash\nexec .pyenv exec python\n",
-        ).unwrap();
+        )
+        .unwrap();
 
         let fake_home = tempdir().unwrap();
 
@@ -194,7 +196,8 @@ mod tests {
             dup_dir2.path(),
             broken_dir.path(),
             orphan_dir.path(),
-        ]).unwrap();
+        ])
+        .unwrap();
 
         let result = run_doctor(path_var.to_str().unwrap(), fake_home.path());
 

@@ -1,9 +1,9 @@
 use clap::{Parser, Subcommand};
+use owo_colors::set_override;
 use std::env;
+use whichway::doctor::run_doctor;
 use whichway::report::{doctor_explain, explain};
 use whichway::resolvers::resolve_all;
-use owo_colors::set_override;
-use whichway::doctor::run_doctor;
 
 #[derive(Parser, Debug)]
 #[command(version, about, name = "whichway")]

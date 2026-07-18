@@ -1,8 +1,8 @@
+use crate::shim_detect::detect_manager;
+use serde::Serialize;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::{env, fs};
-use serde::Serialize;
-use crate::shim_detect::detect_manager;
 
 #[derive(Debug, PartialEq, Serialize)]
 pub enum MatchKind {
@@ -16,7 +16,7 @@ pub enum MatchKind {
 pub enum ManagerInfo {
     Asdf,
     Nvm,
-    Pyenv
+    Pyenv,
 }
 
 impl ManagerInfo {
@@ -24,7 +24,7 @@ impl ManagerInfo {
         match self {
             ManagerInfo::Asdf => ".asdf",
             ManagerInfo::Nvm => ".nvm",
-            ManagerInfo::Pyenv => ".pyenv"
+            ManagerInfo::Pyenv => ".pyenv",
         }
     }
 }
@@ -88,8 +88,8 @@ pub fn resolve_all(cmd: &str, path_var: &str) -> Vec<ResolvedMatch> {
         .map(|(i, path)| {
             let content = fs::read_to_string(&path).unwrap_or_default();
             let manager = detect_manager(&path, &content);
-            let kind =
-                classify(&path, &content).unwrap_or_else(|err| MatchKind::NotIdentified(err.to_string()));
+            let kind = classify(&path, &content)
+                .unwrap_or_else(|err| MatchKind::NotIdentified(err.to_string()));
             ResolvedMatch {
                 path,
                 kind,
@@ -157,7 +157,7 @@ mod tests {
         std::os::unix::fs::symlink(&original_file_path, &link_path).unwrap();
 
         #[cfg(windows)]
-        std::os::windows::fs::symlink_file(original_file_path, link_path).unwrap();
+        std::os::windows::fs::symlink_file(&original_file_path, link_path).unwrap();
 
         let classification = classify(&link_path, "").unwrap();
 
@@ -217,21 +217,33 @@ mod tests {
         std::os::windows::fs::symlink_file(&symlink, &link_path).unwrap();
 
         let resolved = resolve_all("myapp", dir.path().to_str().unwrap());
-        assert_eq!(resolved[0], ResolvedMatch { path: link_path, kind: MatchKind::Symlink { target: symlink }, manager: None, is_active: true });
+        assert_eq!(
+            resolved[0],
+            ResolvedMatch {
+                path: link_path,
+                kind: MatchKind::Symlink { target: symlink },
+                manager: None,
+                is_active: true
+            }
+        );
     }
 
     #[test]
     fn resolve_all_finds_shim() {
         let dir = tempdir().unwrap();
         let shim = dir.path().join("myapp");
-        fs::write(
-            &shim,
-            "#!/usr/bin/env bash\nexec asdf exec python \"$@\"\n",
-        )
-            .unwrap();
+        fs::write(&shim, "#!/usr/bin/env bash\nexec asdf exec python \"$@\"\n").unwrap();
 
         let resolved = resolve_all("myapp", dir.path().to_str().unwrap());
-        assert_eq!(resolved[0], ResolvedMatch { path: shim, kind: MatchKind::Shim, manager: None, is_active: true });
+        assert_eq!(
+            resolved[0],
+            ResolvedMatch {
+                path: shim,
+                kind: MatchKind::Shim,
+                manager: None,
+                is_active: true
+            }
+        );
     }
     #[test]
     fn resolve_all_finds_binary() {
@@ -240,13 +252,27 @@ mod tests {
         fs::write(&binary, [0x7F, 0x45, 0x4C, 0x46, 0x02, 0x01]).unwrap();
 
         let resolved = resolve_all("myapp", dir.path().to_str().unwrap());
-        assert_eq!(resolved[0], ResolvedMatch { path: binary, kind: MatchKind::RealBinary, manager: None, is_active: true });
+        assert_eq!(
+            resolved[0],
+            ResolvedMatch {
+                path: binary,
+                kind: MatchKind::RealBinary,
+                manager: None,
+                is_active: true
+            }
+        );
     }
 
     #[test]
     fn resolve_all_finds_manager_via_path() {
         let dir = tempdir().unwrap();
-        let manager_bin = dir.path().join(".nvm").join("versions").join("node").join("v18.0.0").join("bin");
+        let manager_bin = dir
+            .path()
+            .join(".nvm")
+            .join("versions")
+            .join("node")
+            .join("v18.0.0")
+            .join("bin");
         fs::create_dir_all(&manager_bin).unwrap();
 
         let binary = manager_bin.join("node");
@@ -266,7 +292,8 @@ mod tests {
         fs::write(
             &file_path,
             "#!/usr/bin/env bash\nexec .asdf exec python \"$@\"\n",
-        ).unwrap();
+        )
+        .unwrap();
 
         let resolved = resolve_all("myapp", dir.path().to_str().unwrap());
 
