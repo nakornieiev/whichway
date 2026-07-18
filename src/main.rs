@@ -1,8 +1,9 @@
 use clap::{Parser, Subcommand};
 use std::env;
-use whichway::report::explain;
+use whichway::report::{doctor_explain, explain};
 use whichway::resolvers::resolve_all;
 use owo_colors::set_override;
+use whichway::doctor::run_doctor;
 
 #[derive(Parser, Debug)]
 #[command(version, about, name = "whichway")]
@@ -33,7 +34,22 @@ fn main() {
     }
 
     match &cli.command {
-        Command::Doctor => { todo!(); }
+        Command::Doctor => {
+            let path_var = env::var("PATH").unwrap_or_default();
+            let Some(home) = dirs::home_dir() else {
+                eprintln!("Warning: couldn't determine home directory, skipping orphan shim check");
+                std::process::exit(1);
+            };
+
+            let report = run_doctor(&path_var, &home);
+
+            if cli.json {
+                println!("{}", serde_json::to_string_pretty(&report).unwrap());
+                return;
+            }
+
+            println!("{}", doctor_explain(&report));
+        }
         Command::Resolve(args) => {
             let Some(arg) = args.first() else {
                 eprintln!("Usage: whichway <command> | whichway doctor");
