@@ -1,7 +1,15 @@
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 use std::collections::HashMap;
+use serde::Serialize;
 use crate::shim_detect::detect_manager;
+
+#[derive(Serialize, Debug)]
+pub struct DoctorReport {
+    pub duplicates: HashMap<String, Vec<PathBuf>>,
+    pub broken_symlinks: Vec<PathBuf>,
+    pub orphan_shims: Vec<PathBuf>,
+}
 
 fn list_all_executables(path_var: &str) -> Vec<PathBuf> {
     let mut paths = Vec::new();
@@ -62,6 +70,16 @@ fn find_orphan_shims(paths: &[PathBuf], home: &Path) -> Vec<PathBuf> {
     }
 
     orphan_shims
+}
+
+pub fn run_doctor(path_var: &str, home: &Path) -> DoctorReport {
+    let executables = list_all_executables(path_var);
+
+    DoctorReport {
+        broken_symlinks: find_broken_symlinks(&executables),
+        orphan_shims: find_orphan_shims(&executables, &home),
+        duplicates: find_duplicates(executables),
+    }
 }
 
 #[cfg(test)]
@@ -142,5 +160,45 @@ mod tests {
 
         let orphan_shims = find_orphan_shims(&[shim], dir.path());
         assert_eq!(orphan_shims.len(), 1);
+    }
+
+    #[test]
+    fn doctor_report_aggregates_all_checks() {
+        // Duplicates
+        let dup_dir1 = tempdir().unwrap();
+        let dup_dir2 = tempdir().unwrap();
+        fs::write(dup_dir1.path().join("myapp"), "").unwrap();
+        fs::write(dup_dir2.path().join("myapp"), "").unwrap();
+
+        // Broken symlinks
+        let broken_dir = tempdir().unwrap();
+        let missing_target = broken_dir.path().join("does_not_exist");
+        let broken_link = broken_dir.path().join("brokenlink");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&missing_target, &broken_link).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink(&missing_target, &broken_link).unwrap();
+
+        // Orphan shim
+        let orphan_dir = tempdir().unwrap();
+        fs::write(
+            orphan_dir.path().join("orphanapp"),
+            "#!/bin/bash\nexec .pyenv exec python\n",
+        ).unwrap();
+
+        let fake_home = tempdir().unwrap();
+
+        let path_var = env::join_paths([
+            dup_dir1.path(),
+            dup_dir2.path(),
+            broken_dir.path(),
+            orphan_dir.path(),
+        ]).unwrap();
+
+        let result = run_doctor(path_var.to_str().unwrap(), fake_home.path());
+
+        assert_eq!(result.duplicates.len(), 1);
+        assert_eq!(result.broken_symlinks.len(), 1);
+        assert_eq!(result.orphan_shims.len(), 1);
     }
 }
