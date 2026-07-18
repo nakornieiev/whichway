@@ -44,19 +44,22 @@ whichway doctor
 whichway diff
 ```
 
-Example output (illustrative):
+Example output:
 
 ```
-$ whichway python
-Resolution order for `python`:
+$ whichway npm
+Resolution order for: npm
+  1. /Users/vlad/.nvm/versions/node/v24.16.0/bin/npm  [real binary]  ✅ active
+  2. /usr/local/bin/npm  [real binary]  shadowed
 
-  1. ~/.asdf/shims/python          [asdf shim → python 3.11.7]  ✅ active
-  2. /opt/homebrew/bin/python      [real binary, Homebrew]
-  3. /usr/bin/python               [real binary, system]
-
-Active manager: asdf (via ~/.tool-versions)
-Note: entry #2 is shadowed and will never run unless asdf is removed
-      from PATH or unshimmed.
+$ whichway doctor
+⚠️ Found duplicates for: npm
+        /Users/vlad/.nvm/versions/node/v24.16.0/bin/npm
+        /usr/local/bin/npm
+⚠️ Found broken symlinks:
+        /usr/local/bin/warp-diag
+        /usr/local/bin/docker-index
+✅ Found no orphan shims
 ```
 
 ## Why
@@ -74,11 +77,11 @@ reinventing an existing tool.
 
 **MVP scope:**
 - [x] `whichway <cmd>` — resolution chain with explanations
-- [ ] `whichway doctor` — duplicates, broken symlinks, orphaned shims
-- [ ] bash / zsh support
+- [x] `whichway doctor` — duplicates, broken symlinks, orphaned shims
 - [x] `--json` output for scripting
 
 **Later:**
+- [ ] bash / zsh support
 - [ ] `whichway diff` — login vs interactive shell comparison
 - [ ] fish / nu shell support
 - [ ] Detection of conflicting version managers for the same tool
