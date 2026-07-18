@@ -126,9 +126,9 @@ mod tests {
         fs::write(dir1.path().join("myapp"), "").unwrap();
         fs::write(dir2.path().join("myapp"), "").unwrap();
 
-        let path_var = format!("{}:{}", dir1.path().display(), dir2.path().display());
+        let path_var = env::join_paths([dir1.path(), dir2.path()]).unwrap();
 
-        let matches = find_matches("myapp", &path_var);
+        let matches = find_matches("myapp", path_var.to_str().unwrap());
 
         assert_eq!(matches.len(), 2);
     }

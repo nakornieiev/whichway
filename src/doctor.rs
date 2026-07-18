@@ -95,8 +95,8 @@ mod tests {
         fs::write(dir1.path().join("app1"), "").unwrap();
         fs::write(dir2.path().join("app2"), "").unwrap();
 
-        let path_var = format!("{}:{}", dir1.path().display(), dir2.path().display());
-        let result = list_all_executables(&path_var);
+        let path_var = env::join_paths([dir1.path(), dir2.path()]).unwrap();
+        let result = list_all_executables(&path_var.to_str().unwrap());
 
         assert_eq!(result.len(), 2);
     }
