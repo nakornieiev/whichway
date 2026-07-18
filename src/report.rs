@@ -1,5 +1,6 @@
 use crate::resolvers::{ManagerInfo, MatchKind, ResolvedMatch};
 use owo_colors::{OwoColorize, Stream::Stdout};
+use crate::doctor::DoctorReport;
 
 pub fn explain(m: &ResolvedMatch) -> String {
     let status = if m.is_active {
@@ -36,4 +37,36 @@ pub fn explain(m: &ResolvedMatch) -> String {
     let tag = tag.if_supports_color(Stdout, |text| text.dimmed());
 
     format!("{}   {}", tag, status)
+}
+
+pub fn doctor_explain(report: &DoctorReport) -> String {
+    let mut lines: Vec<String> = Vec::new();
+
+    if !report.duplicates.is_empty() {
+        for (title, el) in report.duplicates.iter() {
+            lines.push(format!("⚠️ Found duplicates for: {}", &title).if_supports_color(Stdout, |text| text.yellow()).to_string());
+            el.iter()
+                .for_each(|el| lines.push(format!("\t{}", el.display())))
+        }
+    } else {
+        lines.push("✅ Found no duplicates".if_supports_color(Stdout, |text| text.green()).to_string());
+    }
+
+    if !report.broken_symlinks.is_empty() {
+        lines.push("⚠️ Found broken symlinks:".if_supports_color(Stdout, |text| text.yellow()).to_string());
+        report.broken_symlinks.iter()
+            .for_each(|el| lines.push(format!("\t{}", el.display())))
+    } else {
+        lines.push("✅ Found no broken symlinks".if_supports_color(Stdout, |text| text.green()).to_string());
+    }
+
+    if !report.orphan_shims.is_empty() {
+        lines.push("⚠️ Found orphan shims:".if_supports_color(Stdout, |text| text.yellow()).to_string());
+        report.orphan_shims.iter()
+            .for_each(|el| lines.push(format!("\t{}", el.display())))
+    } else {
+        lines.push("✅ Found no orphan shims".if_supports_color(Stdout, |text| text.green()).to_string());
+    }
+
+    lines.join("\n")
 }
