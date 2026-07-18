@@ -1,5 +1,8 @@
 # whichway
 
+[![CI](https://github.com/nakornieiev/whichway/actions/workflows/ci.yml/badge.svg)](https://github.com/nakornieiev/whichway/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 > Read-only CLI that explains why a shell command resolves to a specific binary — detects PATH shadowing, orphaned shims, and version manager conflicts (asdf, nvm, pyenv, mise). Diagnoses, never modifies.
 
 `whichway` answers the question every developer has asked at least once:
