@@ -36,7 +36,10 @@ fn find_duplicates(paths: Vec<PathBuf>) -> HashMap<String, Vec<PathBuf>> {
 
     for path in paths {
         let file_name = path.file_name().unwrap().to_string_lossy().into_owned();
-        grouped.entry(file_name).or_default().push(path);
+        let entry = grouped.entry(file_name).or_default();
+        if !entry.contains(&path) {
+            entry.push(path);
+        }
     }
 
     grouped.into_iter().filter(|(_, v)| v.len() > 1).collect()
