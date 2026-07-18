@@ -19,11 +19,10 @@ fn list_all_executables(path_var: &str) -> Vec<PathBuf> {
             for entry in entries.flatten() {
                 let path = entry.path();
 
-                if let Ok(meta) = fs::symlink_metadata(&path) {
-                    if meta.is_file() || meta.file_type().is_symlink() {
+                if let Ok(meta) = fs::symlink_metadata(&path)
+                    && (meta.is_file() || meta.file_type().is_symlink()) {
                         paths.push(path);
                     }
-                }
             }
         }
     }
@@ -63,13 +62,12 @@ fn find_orphan_shims(paths: &[PathBuf], home: &Path) -> Vec<PathBuf> {
 
 
     for path in paths {
-        let content = fs::read_to_string(&path).unwrap_or(String::from(""));
+        let content = fs::read_to_string(path).unwrap_or(String::from(""));
 
-        if let Some(manager) = detect_manager(&path, &content) {
-            if !home.join(manager.home_dir()).exists() {
+        if let Some(manager) = detect_manager(path, &content)
+            && !home.join(manager.home_dir()).exists() {
                 orphan_shims.push(path.clone());
             }
-        }
     }
 
     orphan_shims
@@ -80,7 +78,7 @@ pub fn run_doctor(path_var: &str, home: &Path) -> DoctorReport {
 
     DoctorReport {
         broken_symlinks: find_broken_symlinks(&executables),
-        orphan_shims: find_orphan_shims(&executables, &home),
+        orphan_shims: find_orphan_shims(&executables, home),
         duplicates: find_duplicates(executables),
     }
 }
