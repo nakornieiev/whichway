@@ -157,7 +157,7 @@ mod tests {
         std::os::unix::fs::symlink(&original_file_path, &link_path).unwrap();
 
         #[cfg(windows)]
-        std::os::windows::fs::symlink_file(&original_file_path, link_path).unwrap();
+        std::os::windows::fs::symlink_file(&original_file_path, &link_path).unwrap();
 
         let classification = classify(&link_path, "").unwrap();
 
