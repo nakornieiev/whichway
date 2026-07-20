@@ -300,4 +300,9 @@ mod tests {
         assert_eq!(resolved[0].kind, MatchKind::Shim);
         assert_eq!(resolved[0].manager, Some(ManagerInfo::Asdf));
     }
+
+    #[test]
+    fn intentionally_failing_test() {
+        assert_eq!(1, 2);
+    }
 }
