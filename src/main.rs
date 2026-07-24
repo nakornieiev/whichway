@@ -37,7 +37,7 @@ fn main() {
         Command::Doctor => {
             let path_var = env::var("PATH").unwrap_or_default();
             let Some(home) = dirs::home_dir() else {
-                eprintln!("Warning: couldn't determine home directory, skipping orphan shim check");
+                eprintln!("Error: couldn't determine home directory, cannot run doctor");
                 std::process::exit(1);
             };
 
