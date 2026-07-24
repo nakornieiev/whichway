@@ -35,7 +35,10 @@ fn find_duplicates(paths: Vec<PathBuf>) -> HashMap<String, Vec<PathBuf>> {
     let mut grouped: HashMap<String, Vec<PathBuf>> = HashMap::new();
 
     for path in paths {
-        let file_name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let Some(name) = path.file_name() else {
+            continue;
+        };
+        let file_name = name.to_string_lossy().into_owned();
         let entry = grouped.entry(file_name).or_default();
         if !entry.contains(&path) {
             entry.push(path);
@@ -51,7 +54,7 @@ fn find_broken_symlinks(paths: &[PathBuf]) -> Vec<PathBuf> {
         .filter(|path| {
             fs::symlink_metadata(path)
                 .map(|meta| meta.file_type().is_symlink())
-                .unwrap_or(false)
+                .unwrap_or_default()
                 && !path.exists()
         })
         .cloned()
@@ -62,7 +65,7 @@ fn find_orphan_shims(paths: &[PathBuf], home: &Path) -> Vec<PathBuf> {
     let mut orphan_shims: Vec<PathBuf> = Vec::new();
 
     for path in paths {
-        let content = fs::read_to_string(path).unwrap_or(String::from(""));
+        let content = fs::read_to_string(path).unwrap_or_default();
 
         if let Some(manager) = detect_manager(path, &content)
             && !home.join(manager.home_dir()).exists()
