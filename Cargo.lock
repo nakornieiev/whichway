@@ -455,15 +455,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
 
 [[package]]
-name = "which"
-version = "8.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3ef584124b911bcc3875c2f1472e80f24361ceb789bd1c62b3e9a3df9ff43c"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "whichway"
 version = "0.1.0"
 dependencies = [
@@ -473,7 +464,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "which",
 ]
 
 [[package]]
