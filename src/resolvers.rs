@@ -88,7 +88,6 @@ pub fn classify(path: &PathBuf, content: &str) -> Result<MatchKind, ClassifyErro
         }
     }
 
-    #[cfg(unix)]
     if content.starts_with("#!") {
         return Ok(MatchKind::Shim);
     }
