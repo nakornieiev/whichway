@@ -73,7 +73,22 @@ pub fn classify(path: &PathBuf, content: &str) -> Result<MatchKind, ClassifyErro
         return Ok(MatchKind::Symlink { target });
     }
 
-    // TODO: Windows shim detection (.bat/.cmd) is not yet supported
+    #[cfg(windows)]
+    {
+        let is_batch_shim = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.eq_ignore_ascii_case("cmd") || ext.eq_ignore_ascii_case("bat"))
+            .unwrap_or_default()
+            && content.contains("%~dp0")
+            && content.contains("%*");
+
+        if is_batch_shim {
+            return Ok(MatchKind::Shim);
+        }
+    }
+
+    #[cfg(unix)]
     if content.starts_with("#!") {
         return Ok(MatchKind::Shim);
     }
@@ -184,6 +199,31 @@ mod tests {
         let classification = classify(&file_path, &content).unwrap();
 
         assert_eq!(classification, MatchKind::Shim);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn classify_windows_batch_shim() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("myapp.cmd");
+        fs::write(&file_path, "@echo off\r\n\"%~dp0node.exe\" %*\r\n").unwrap();
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        let classification = classify(&file_path, &content).unwrap();
+
+        assert_eq!(classification, MatchKind::Shim);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn classify_windows_real_exe_not_shim() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("node.exe");
+        fs::write(&file_path, [0x4D, 0x5A]).unwrap(); // MZ header — типовий початок Windows PE-бінарника
+
+        let classification = classify(&file_path, "").unwrap();
+
+        assert_eq!(classification, MatchKind::RealBinary);
     }
 
     #[test]
