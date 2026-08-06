@@ -4,10 +4,14 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
+/// Aggregated results from scanning every directory in a `PATH` variable.
 #[derive(Serialize, Debug)]
 pub struct DoctorReport {
+    /// Command names that appear more than once across `PATH` directories.
     pub duplicates: HashMap<String, Vec<PathBuf>>,
+    /// Symlinks whose target no longer exists.
     pub broken_symlinks: Vec<PathBuf>,
+    /// Shim scripts whose version manager home directory is missing from `home`.
     pub orphan_shims: Vec<PathBuf>,
 }
 
@@ -77,6 +81,10 @@ fn find_orphan_shims(paths: &[PathBuf], home: &Path) -> Vec<PathBuf> {
     orphan_shims
 }
 
+/// Scans `path_var` for duplicates, broken symlinks, and orphaned shims.
+///
+/// `home` is used to verify that detected version managers (asdf, nvm, pyenv) are
+/// still installed; shims referencing a missing manager are reported as orphans.
 pub fn run_doctor(path_var: &str, home: &Path) -> DoctorReport {
     let executables = list_all_executables(path_var);
 

@@ -4,22 +4,32 @@ use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::{env, fs};
 
+/// How an executable on disk was classified.
 #[derive(Debug, PartialEq, Serialize)]
 pub enum MatchKind {
+    /// A regular file that is not a symlink or shim script.
     RealBinary,
+    /// A symlink pointing at another path.
     Symlink { target: PathBuf },
+    /// A wrapper script or batch shim that delegates to another binary.
     Shim,
+    /// Classification failed; holds the error message.
     NotIdentified(String),
 }
 
+/// A version manager known to `whichway`.
 #[derive(Debug, PartialEq, Serialize)]
 pub enum ManagerInfo {
+    /// [asdf](https://asdf-vm.com/) version manager.
     Asdf,
+    /// [nvm](https://github.com/nvm-sh/nvm) Node version manager.
     Nvm,
+    /// [pyenv](https://github.com/pyenv/pyenv) Python version manager.
     Pyenv,
 }
 
 impl ManagerInfo {
+    /// Returns the hidden directory name for this manager in the user's home folder.
     pub fn home_dir(&self) -> &'static str {
         match self {
             ManagerInfo::Asdf => ".asdf",
@@ -29,17 +39,25 @@ impl ManagerInfo {
     }
 }
 
+/// One executable that matches a command name within a `PATH` variable.
 #[derive(Debug, Serialize, PartialEq)]
 pub struct ResolvedMatch {
+    /// Path to the executable.
     pub path: PathBuf,
+    /// Classification of the file at [`Self::path`].
     pub kind: MatchKind,
+    /// Detected version manager, if any.
     pub manager: Option<ManagerInfo>,
+    /// `true` for the first match in resolution order (the one the shell would run).
     pub is_active: bool,
 }
 
+/// Errors that can occur while classifying a single path.
 #[derive(Debug)]
 pub enum ClassifyError {
+    /// `symlink_metadata` failed (e.g. permission denied or missing file).
     MetadataReadFailed(std::io::Error),
+    /// `read_link` failed on a path that appears to be a symlink.
     ReadLinkFailed(std::io::Error),
 }
 
@@ -52,6 +70,7 @@ impl Display for ClassifyError {
     }
 }
 
+/// Returns every regular file named `cmd` found in `path_var`, in resolution order.
 pub fn find_matches(cmd: &str, path_var: &str) -> Vec<PathBuf> {
     env::split_paths(path_var)
         .map(|dir| dir.join(cmd))
@@ -59,6 +78,7 @@ pub fn find_matches(cmd: &str, path_var: &str) -> Vec<PathBuf> {
         .collect()
 }
 
+/// Classifies an executable at `path` using filesystem metadata and file `content`.
 pub fn classify(path: &PathBuf, content: &str) -> Result<MatchKind, ClassifyError> {
     let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
@@ -95,6 +115,10 @@ pub fn classify(path: &PathBuf, content: &str) -> Result<MatchKind, ClassifyErro
     Ok(MatchKind::RealBinary)
 }
 
+/// Finds all matches for `cmd` in `path_var` with kind, manager, and active status.
+///
+/// The first entry is marked [`ResolvedMatch::is_active`]. Classification errors
+/// become [`MatchKind::NotIdentified`] instead of aborting the scan.
 pub fn resolve_all(cmd: &str, path_var: &str) -> Vec<ResolvedMatch> {
     find_matches(cmd, path_var)
         .into_iter()

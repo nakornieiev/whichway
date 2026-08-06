@@ -1,6 +1,9 @@
 use crate::resolvers::ManagerInfo;
 use std::path::{Component, Path};
 
+/// Detects whether an executable belongs to a known version manager.
+///
+/// Checks path components first, then falls back to scanning `content`.
 pub fn detect_manager(path: &Path, content: &str) -> Option<ManagerInfo> {
     for component in path.components() {
         if let Component::Normal(name) = component {
