@@ -85,6 +85,26 @@ fn find_orphan_shims(paths: &[PathBuf], home: &Path) -> Vec<PathBuf> {
 ///
 /// `home` is used to verify that detected version managers (asdf, nvm, pyenv) are
 /// still installed; shims referencing a missing manager are reported as orphans.
+///
+/// # Examples
+/// ```
+/// # use std::env::join_paths;
+/// # use tempfile::tempdir;
+/// # use std::fs;
+/// # let dir1 = tempdir().unwrap();
+/// # let dir2 = tempdir().unwrap();
+/// # fs::write(dir1.path().join("myapp"), "").unwrap();
+/// # fs::write(dir2.path().join("myapp"), "").unwrap();
+/// # let path_var = join_paths([dir1.path(), dir2.path()]).unwrap();
+/// # let home = tempdir().unwrap();
+/// use whichway::doctor::run_doctor;
+///
+/// let report = run_doctor(path_var.to_str().unwrap(), home.path());
+///
+/// assert!(report.duplicates.contains_key("myapp"));
+/// assert_eq!(report.duplicates["myapp"].len(), 2);
+/// assert!(report.broken_symlinks.is_empty());
+/// ```
 pub fn run_doctor(path_var: &str, home: &Path) -> DoctorReport {
     let executables = list_all_executables(path_var);
 

@@ -17,6 +17,8 @@
 //! }
 //! ```
 
+#![warn(missing_docs)]
+
 /// PATH-wide health checks: duplicates, broken symlinks, orphaned shims.
 pub mod doctor;
 /// Human-readable formatting for CLI output.

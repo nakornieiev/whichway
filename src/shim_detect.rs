@@ -3,7 +3,11 @@ use std::path::{Component, Path};
 
 /// Detects whether an executable belongs to a known version manager.
 ///
-/// Checks path components first, then falls back to scanning `content`.
+/// Checks path components first (exact segment match against `.asdf`, `.nvm`,
+/// `.pyenv`); if none match, falls back to a substring search over `content`.
+/// The content fallback is a heuristic — it does not parse shell syntax, so a
+/// file that merely mentions a manager's directory name (e.g. in a comment)
+/// may be misclassified.
 pub fn detect_manager(path: &Path, content: &str) -> Option<ManagerInfo> {
     for component in path.components() {
         if let Component::Normal(name) = component {

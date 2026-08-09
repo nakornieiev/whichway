@@ -10,7 +10,10 @@ pub enum MatchKind {
     /// A regular file that is not a symlink or shim script.
     RealBinary,
     /// A symlink pointing at another path.
-    Symlink { target: PathBuf },
+    Symlink {
+        /// Path to the symlink's target.
+        target: PathBuf,
+    },
     /// A wrapper script or batch shim that delegates to another binary.
     Shim,
     /// Classification failed; holds the error message.
@@ -70,7 +73,11 @@ impl Display for ClassifyError {
     }
 }
 
-/// Returns every regular file named `cmd` found in `path_var`, in resolution order.
+/// Returns all file paths matching the given binary name (`cmd`) found within the
+/// directories specified in `path_var`, in search order.
+///
+/// Broken symlinks are silently excluded, since they don't resolve to a runnable
+/// file. Use [`crate::doctor::run_doctor`] to detect broken symlinks specifically.
 pub fn find_matches(cmd: &str, path_var: &str) -> Vec<PathBuf> {
     env::split_paths(path_var)
         .map(|dir| dir.join(cmd))
@@ -79,6 +86,26 @@ pub fn find_matches(cmd: &str, path_var: &str) -> Vec<PathBuf> {
 }
 
 /// Classifies an executable at `path` using filesystem metadata and file `content`.
+///
+/// # Errors
+///
+/// This function will return [`ClassifyError`] in the following situations:
+/// * [`ClassifyError::MetadataReadFailed`] - if reading the file metadata fails
+/// * [`ClassifyError::ReadLinkFailed`] - if reading the symlink target fails
+/// # Examples
+/// ```
+/// # use tempfile::tempdir;
+/// # use std::fs;
+/// # let dir = tempdir().unwrap();
+/// # let path = dir.path().join("myapp");
+/// # fs::write(&path, "#!/bin/sh\necho hi\n").unwrap();
+/// use whichway::resolvers::{classify, MatchKind};
+///
+/// let content = fs::read_to_string(&path).unwrap();
+/// let kind = classify(&path, &content).unwrap();
+///
+/// assert_eq!(kind, MatchKind::Shim);
+/// ```
 pub fn classify(path: &PathBuf, content: &str) -> Result<MatchKind, ClassifyError> {
     let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
@@ -119,6 +146,28 @@ pub fn classify(path: &PathBuf, content: &str) -> Result<MatchKind, ClassifyErro
 ///
 /// The first entry is marked [`ResolvedMatch::is_active`]. Classification errors
 /// become [`MatchKind::NotIdentified`] instead of aborting the scan.
+///
+/// # Examples
+/// ```
+/// # use std::env::join_paths;
+/// # use tempfile::tempdir;
+/// # use std::fs;
+/// # let dir1 = tempdir().unwrap();
+/// # let dir2 = tempdir().unwrap();
+/// # let path1 = dir1.path().join("myapp");
+/// # let path2 = dir2.path().join("myapp");
+/// # fs::write(&path1, "").unwrap();
+/// # fs::write(&path2, "").unwrap();
+/// # let path_var = join_paths([dir1.path(), dir2.path()]).unwrap();
+/// use whichway::resolvers::resolve_all;
+///
+/// let result = resolve_all("myapp", path_var.to_str().unwrap());
+///
+/// assert_eq!(result.len(), 2);
+/// assert_eq!(result[0].path, path1);
+/// assert!(result[0].is_active);
+/// assert!(!result[1].is_active);
+/// ```
 pub fn resolve_all(cmd: &str, path_var: &str) -> Vec<ResolvedMatch> {
     find_matches(cmd, path_var)
         .into_iter()
