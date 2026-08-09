@@ -2,6 +2,7 @@ use crate::doctor::DoctorReport;
 use crate::resolvers::{ManagerInfo, MatchKind, ResolvedMatch};
 use owo_colors::{OwoColorize, Stream::Stdout};
 
+/// Formats a single [`ResolvedMatch`] as a tag and status line for terminal output.
 pub fn explain(m: &ResolvedMatch) -> String {
     let status = if m.is_active {
         "✅ active"
@@ -43,6 +44,7 @@ pub fn explain(m: &ResolvedMatch) -> String {
     format!("{}   {}", tag, status)
 }
 
+/// Formats a [`DoctorReport`] as a multi-line summary for terminal output.
 pub fn doctor_explain(report: &DoctorReport) -> String {
     let mut lines: Vec<String> = Vec::new();
 

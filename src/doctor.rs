@@ -4,10 +4,14 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
+/// Aggregated results from scanning every directory in a `PATH` variable.
 #[derive(Serialize, Debug)]
 pub struct DoctorReport {
+    /// Command names that appear more than once across `PATH` directories.
     pub duplicates: HashMap<String, Vec<PathBuf>>,
+    /// Symlinks whose target no longer exists.
     pub broken_symlinks: Vec<PathBuf>,
+    /// Shim scripts whose version manager home directory is missing from `home`.
     pub orphan_shims: Vec<PathBuf>,
 }
 
@@ -77,6 +81,30 @@ fn find_orphan_shims(paths: &[PathBuf], home: &Path) -> Vec<PathBuf> {
     orphan_shims
 }
 
+/// Scans `path_var` for duplicates, broken symlinks, and orphaned shims.
+///
+/// `home` is used to verify that detected version managers (asdf, nvm, pyenv) are
+/// still installed; shims referencing a missing manager are reported as orphans.
+///
+/// # Examples
+/// ```
+/// # use std::env::join_paths;
+/// # use tempfile::tempdir;
+/// # use std::fs;
+/// # let dir1 = tempdir().unwrap();
+/// # let dir2 = tempdir().unwrap();
+/// # fs::write(dir1.path().join("myapp"), "").unwrap();
+/// # fs::write(dir2.path().join("myapp"), "").unwrap();
+/// # let path_var = join_paths([dir1.path(), dir2.path()]).unwrap();
+/// # let home = tempdir().unwrap();
+/// use whichway::doctor::run_doctor;
+///
+/// let report = run_doctor(path_var.to_str().unwrap(), home.path());
+///
+/// assert!(report.duplicates.contains_key("myapp"));
+/// assert_eq!(report.duplicates["myapp"].len(), 2);
+/// assert!(report.broken_symlinks.is_empty());
+/// ```
 pub fn run_doctor(path_var: &str, home: &Path) -> DoctorReport {
     let executables = list_all_executables(path_var);
 
